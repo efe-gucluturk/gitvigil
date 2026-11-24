@@ -60,7 +60,11 @@ def scan(
     ] = OutputFormat.table,
     fail_on: Annotated[
         Severity,
-        typer.Option("--fail-on", help="Exit 1 if any finding has at least this severity."),
+        typer.Option(
+            "--fail-on",
+            case_sensitive=False,
+            help="Exit 1 if any finding has at least this severity.",
+        ),
     ] = Severity.LOW,
     ignore_file: Annotated[
         Path | None, typer.Option("--ignore-file", help="Custom ignore file.")
