@@ -1,0 +1,194 @@
+# GitVigil IaC misconfiguration rules.
+# Each rule is bound to a check implementation in engine/iac.py by `id`; the loader fails
+# closed if a rule has no implementation or an implementation has no rule.
+version: 1
+rules:
+  # ---------------------------------------------------------------- Dockerfile
+  - id: GV-DKR-001
+    title: Container runs as root (no USER instruction)
+    targets: [dockerfile]
+    severity: MEDIUM
+    cwe: CWE-250
+    description: The final build stage never sets USER, so the container process runs as root.
+    remediation: Create an unprivileged user and add `USER <name>` (or a numeric UID) before the ENTRYPOINT/CMD of the final stage.
+  - id: GV-DKR-002
+    title: Container explicitly runs as root
+    targets: [dockerfile]
+    severity: HIGH
+    cwe: CWE-250
+    description: The final stage switches to USER root/0, so the process keeps full privileges.
+    remediation: Switch back to a non-root USER after any step that needs root, and never end the image as root.
+  - id: GV-DKR-003
+    title: Unpinned base image (implicit or explicit ':latest')
+    targets: [dockerfile]
+    severity: MEDIUM
+    cwe: CWE-829
+    description: The base image tag floats, so builds are not reproducible and may pull compromised or breaking content.
+    remediation: Pin the base image to a specific version tag and preferably an immutable digest (image@sha256:...).
+  - id: GV-DKR-004
+    title: Hardcoded secret in ENV/ARG
+    targets: [dockerfile]
+    severity: HIGH
+    cwe: CWE-798
+    description: A secret-like ENV/ARG is given a literal value that is baked into image layers and history.
+    remediation: Remove the value. Inject secrets at runtime (orchestrator secrets) or use BuildKit `--mount=type=secret`.
+
+  # ---------------------------------------------------------------- docker-compose
+  - id: GV-CMP-001
+    title: Privileged container
+    targets: [compose]
+    severity: CRITICAL
+    cwe: CWE-250
+    description: "`privileged: true` gives the container nearly all host capabilities and device access."
+    remediation: "Remove `privileged: true`; grant only the specific capabilities or devices required."
+  - id: GV-CMP-002
+    title: Host network namespace shared
+    targets: [compose]
+    severity: HIGH
+    cwe: CWE-668
+    description: "`network_mode: host` removes network isolation between container and host."
+    remediation: Use the default bridge or a user-defined network and publish only the needed ports.
+  - id: GV-CMP-003
+    title: Host PID namespace shared
+    targets: [compose]
+    severity: HIGH
+    cwe: CWE-668
+    description: "`pid: host` lets the container see and signal every host process."
+    remediation: "Remove `pid: host`."
+  - id: GV-CMP-004
+    title: Hardcoded secret in environment
+    targets: [compose]
+    severity: HIGH
+    cwe: CWE-798
+    description: A secret-like environment variable is set to a literal value in the compose file.
+    remediation: Use Docker/Compose secrets or an untracked env_file / variable substitution (`${VAR}`).
+  - id: GV-CMP-005
+    title: Unpinned ':latest' image
+    targets: [compose]
+    severity: MEDIUM
+    cwe: CWE-829
+    description: The service image has no tag or uses ':latest'.
+    remediation: Pin the image to a version tag and preferably a digest.
+  - id: GV-CMP-006
+    title: Service runs as root user
+    targets: [compose]
+    severity: MEDIUM
+    cwe: CWE-250
+    description: "`user:` is explicitly set to root/0."
+    remediation: Run the service as an unprivileged user.
+  - id: GV-CMP-007
+    title: Docker socket mounted into container
+    targets: [compose]
+    severity: HIGH
+    cwe: CWE-269
+    description: Mounting /var/run/docker.sock gives the container control of the host Docker daemon (root-equivalent).
+    remediation: Avoid mounting the socket; use a restricted socket proxy if API access is unavoidable.
+
+  # ---------------------------------------------------------------- Kubernetes
+  - id: GV-K8S-001
+    title: Privileged container
+    targets: [kubernetes]
+    severity: CRITICAL
+    cwe: CWE-250
+    description: "securityContext.privileged is true."
+    remediation: "Set `privileged: false` and drop all capabilities, adding back only what is required."
+  - id: GV-K8S-002
+    title: Host network namespace shared
+    targets: [kubernetes]
+    severity: HIGH
+    cwe: CWE-668
+    description: "`hostNetwork: true` exposes the node network stack to the pod."
+    remediation: Remove `hostNetwork` and expose the workload through a Service.
+  - id: GV-K8S-003
+    title: Host PID namespace shared
+    targets: [kubernetes]
+    severity: HIGH
+    cwe: CWE-668
+    description: "`hostPID: true` lets the pod observe and signal host processes."
+    remediation: Remove `hostPID`.
+  - id: GV-K8S-004
+    title: Container configured to run as root
+    targets: [kubernetes]
+    severity: HIGH
+    cwe: CWE-250
+    description: runAsUser is 0 or runAsNonRoot is false.
+    remediation: "Set `runAsNonRoot: true` and a non-zero `runAsUser`."
+  - id: GV-K8S-005
+    title: Unpinned ':latest' image
+    targets: [kubernetes]
+    severity: MEDIUM
+    cwe: CWE-829
+    description: The container image has no tag or uses ':latest'.
+    remediation: Pin images to a version tag and preferably a digest.
+  - id: GV-K8S-006
+    title: Hardcoded secret in env
+    targets: [kubernetes]
+    severity: HIGH
+    cwe: CWE-798
+    description: A secret-like env var uses a literal `value:` instead of `valueFrom`.
+    remediation: Reference a Secret via `valueFrom.secretKeyRef` (ideally backed by an external secret store).
+  - id: GV-K8S-007
+    title: Privilege escalation allowed
+    targets: [kubernetes]
+    severity: HIGH
+    cwe: CWE-269
+    description: "`allowPrivilegeEscalation: true` lets processes gain more privileges than their parent."
+    remediation: "Set `allowPrivilegeEscalation: false`."
+  - id: GV-K8S-008
+    title: Unrestricted ingress from 0.0.0.0/0
+    targets: [kubernetes]
+    severity: HIGH
+    cwe: CWE-284
+    description: A NetworkPolicy or LoadBalancer Service admits traffic from 0.0.0.0/0.
+    remediation: Restrict the source CIDR ranges to known networks.
+
+  # ---------------------------------------------------------------- Terraform
+  - id: GV-TF-001
+    title: Unrestricted ingress from 0.0.0.0/0
+    targets: [terraform]
+    severity: CRITICAL
+    cwe: CWE-284
+    description: An ingress rule is open to the entire internet (0.0.0.0/0, ::/0 or '*').
+    remediation: Limit ingress to specific CIDR ranges or security groups, and never expose admin ports publicly.
+  - id: GV-TF-002
+    title: Hardcoded secret in configuration
+    targets: [terraform]
+    severity: HIGH
+    cwe: CWE-798
+    description: A secret-like attribute or variable default is a literal string in the Terraform source.
+    remediation: Mark the variable `sensitive`, supply it via environment/secret manager, and rotate the exposed value.
+  - id: GV-TF-003
+    title: Privileged container
+    targets: [terraform]
+    severity: CRITICAL
+    cwe: CWE-250
+    description: A container definition sets `privileged = true`.
+    remediation: Remove the privileged flag and grant only the specific capabilities needed.
+  - id: GV-TF-004
+    title: Host network or PID namespace shared
+    targets: [terraform]
+    severity: HIGH
+    cwe: CWE-668
+    description: host_network / host_pid / host_ipc is enabled for a workload.
+    remediation: Disable host namespace sharing.
+  - id: GV-TF-005
+    title: Unpinned ':latest' image
+    targets: [terraform]
+    severity: MEDIUM
+    cwe: CWE-829
+    description: An image reference explicitly uses the ':latest' tag.
+    remediation: Pin to a version tag or digest.
+  - id: GV-TF-006
+    title: Publicly readable/writable S3 ACL
+    targets: [terraform]
+    severity: HIGH
+    cwe: CWE-732
+    description: A bucket ACL grants public-read or public-read-write access.
+    remediation: Use a private ACL and block public access at the bucket and account level.
+  - id: GV-TF-007
+    title: Database instance publicly accessible
+    targets: [terraform]
+    severity: HIGH
+    cwe: CWE-284
+    description: "`publicly_accessible = true` exposes the database endpoint to the internet."
+    remediation: Set `publicly_accessible = false` and reach the database through private networking.
