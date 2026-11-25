@@ -5,3 +5,21 @@ __pycache__/
 .ruff_cache/
 dist/
 build/
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Local databases and data dumps
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
+*.dump
+
+# Local output and scratch/recon data (never commit)
+output/
+Recon-Karneler/
