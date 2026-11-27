@@ -12,9 +12,11 @@ gitvigil rules
 Secrets are redacted by default. See `CLAUDE.md` for the security model.
 Suppress with a `.gitvigilignore` (gitignore-style path globs, plus `sha256:<fingerprint>` lines).
 
-## Authorized & Educational Use Only
+## Authorized & Educational Use Only / Yalnızca Yetkili ve Eğitim Amaçlı Kullanım
 
 GitVigil is provided for authorized security auditing of repositories you own or have explicit
 permission to test, and for educational purposes. It is a passive, read-only scanner of Git
 history and IaC files; do not use it against systems or data you are not authorized to assess.
 The author accepts no liability for misuse. Provided under the MIT License (see `LICENSE`).
+
+**Yalnızca Yetkili ve Eğitim Amaçlı Kullanım.** Bu proje yalnızca sahibi olduğunuz veya açık yazılı izin aldığınız sistemlerde ve eğitim amacıyla kullanılmalıdır. İzinsiz kullanım 5237 sayılı Türk Ceza Kanunu m. 243–244 kapsamında suç oluşturabilir; yazar kötüye kullanımdan sorumlu tutulamaz.
